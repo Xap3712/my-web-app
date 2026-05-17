@@ -32,21 +32,22 @@ jobs:
         run: |
           Write-Host "Copying files to $env:WEB_SERVER_PATH" -ForegroundColor Yellow
           robocopy . $env:WEB_SERVER_PATH /MIR /R:2 /W:2 /NP
-          # robocopy exit codes: 0=no copy, 1=copy success, 2=extra files, etc.
-          if ($LASTEXITCODE -ge 8) {
-            Write-Host "Robocopy failed with exit code $LASTEXITCODE" -ForegroundColor Red
+          $rc = $LASTEXITCODE
+          Write-Host "Robocopy exit code: $rc" -ForegroundColor Cyan
+          if ($rc -ge 8) {
+            Write-Host "❌ Robocopy failed with exit code $rc" -ForegroundColor Red
             exit 1
+          } else {
+            Write-Host "✅ Files copied successfully! (exit code $rc)" -ForegroundColor Green
+            exit 0
           }
-          Write-Host "Files copied successfully!" -ForegroundColor Green
       
       - name: Verify deployment
         shell: powershell
         run: |
           Write-Host "Verifying deployment..." -ForegroundColor Yellow
           if (Test-Path "$env:WEB_SERVER_PATH\index.html") {
-            $content = Get-Content "$env:WEB_SERVER_PATH\index.html"
             Write-Host "✅ index.html deployed successfully" -ForegroundColor Green
-            Write-Host "First line: $($content[0])"
           } else {
             Write-Host "❌ Deployment failed - index.html not found" -ForegroundColor Red
             exit 1
