@@ -8,10 +8,9 @@ env:
   WEB_SERVER_PATH: 'D:\WebSites\MyApp'
 
 jobs:
-  # JOB 1: Тестирование
   test-job:
     name: Run automated tests
-    runs-on: self-hosted  # runner на вашем компьютере
+    runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -20,31 +19,38 @@ jobs:
         shell: powershell
         run: ./test.ps1
 
-  # JOB 2: Деплой (зависит от успеха теста)
   deploy-job:
     name: Deploy to IIS Server
     runs-on: self-hosted
-    needs: test-job  # запускается только после успешного теста
+    needs: test-job
     steps:
       - name: Get latest code
         uses: actions/checkout@v4
       
-      - name: Stop IIS Site
-        shell: powershell
-        run: |
-          Write-Host "Stopping IIS Site..."
-          & 'C:\Windows\System32\inetsrv\appcmd.exe' stop site "MyApp"
-      
       - name: Copy files to web directory
         shell: powershell
         run: |
-          Write-Host "Copying files to $env:WEB_SERVER_PATH"
-          robocopy . $env:WEB_SERVER_PATH /MIR /R:1 /W:1
-          exit 0
+          Write-Host "Copying files to $env:WEB_SERVER_PATH" -ForegroundColor Yellow
+          robocopy . $env:WEB_SERVER_PATH /MIR /R:2 /W:2 /NP
+          # robocopy exit codes: 0=no copy, 1=copy success, 2=extra files, etc.
+          if ($LASTEXITCODE -ge 8) {
+            Write-Host "Robocopy failed with exit code $LASTEXITCODE" -ForegroundColor Red
+            exit 1
+          }
+          Write-Host "Files copied successfully!" -ForegroundColor Green
       
-      - name: Start IIS Site
+      - name: Verify deployment
         shell: powershell
         run: |
-          Write-Host "Starting IIS Site..."
-          & 'C:\Windows\System32\inetsrv\appcmd.exe' start site "MyApp"
-          Write-Host "Deployment completed!"
+          Write-Host "Verifying deployment..." -ForegroundColor Yellow
+          if (Test-Path "$env:WEB_SERVER_PATH\index.html") {
+            $content = Get-Content "$env:WEB_SERVER_PATH\index.html"
+            Write-Host "✅ index.html deployed successfully" -ForegroundColor Green
+            Write-Host "First line: $($content[0])"
+          } else {
+            Write-Host "❌ Deployment failed - index.html not found" -ForegroundColor Red
+            exit 1
+          }
+      
+      - name: Deployment completed
+        run: echo "✅ Deployment completed successfully!"
